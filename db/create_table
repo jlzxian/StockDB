@@ -1,0 +1,38 @@
+CREATE TABLE stock_dict (
+	id SERIAL PRIMARY KEY,
+	symbol TEXT NOT NULL UNIQUE,
+	name TEXT NULL,
+	exchange TEXT NOT NULL,
+	is_etf BOOLEAN NOT NULL
+);
+
+-- ETF and its holdings
+CREATE TABLE ETF_HOLDING(
+	etf_id INTEGER NOT NULL,
+	stock_id INTEGER NOT NULL,
+	dt DATE NOT NULL,
+	shares NUMERIC NOT NULL,
+	weight NUMERIC,
+	PRIMARY KEY (etf_id, stock_id, dt),
+	CONSTRAINT fk_etf FOREIGN KEY (etf_id) REFERENCES stock_dict (id),
+	CONSTRAINT fk_stock FOREIGN KEY (stock_id) REFERENCES stock_dict (id)
+
+);
+
+CREATE TABLE stock_price (
+	stock_id INTEGER NOT NULL,
+	dt TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+	open NUMERIC,
+	high NUMERIC,
+	low NUMERIC, 
+	close NUMERIC, 
+	volume INTEGER,
+	PRIMARY KEY(stock_id, dt),
+	CONSTRAINT fk_stock FOREIGN KEY (stock_id) REFERENCES stock_dict (id)
+);
+
+CREATE INDEX ON stock_price (stock_id, dt DESC);
+
+-- For creating timescaledb's hpyertable
+CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+SELECT create_hytertable('stock_price', 'dt');
