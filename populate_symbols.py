@@ -27,7 +27,7 @@ cursor = connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
 ###############
 # Reading in asstes from NASDAQ
-df = pd.read_csv("./Data/tickers.txt", sep="|")
+df = pd.read_csv("./data/tickers.txt", sep="|")
 
 for index, stock in df.iterrows():
     cursor.execute("""

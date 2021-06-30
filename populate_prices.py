@@ -4,6 +4,8 @@ import aiohttp, asyncpg, asyncio
 from io import StringIO
 import numpy as np
 from decimal import Decimal
+import warnings
+from tqdm import tqdm
 
 async def write_to_db(connection, params):
     # Batch load into posgres
@@ -18,9 +20,12 @@ async def get_price(pool, stock_id, url):
                     resp = await response.read()
                     resp = str(resp, 'utf-8') # Converting bytes into string
                     data = StringIO(resp)
-                    data = np.genfromtxt(data, dtype=None, delimiter=',', skip_header=1)
-                    params = [(stock_id, datetime.datetime.strptime(str(bar[0], 'utf-8'), "%Y-%m-%d %H:%M:%S"), round(Decimal(bar[1]), 2), round(Decimal(bar[2]), 2), round(Decimal(bar[3]), 2), round(Decimal(bar[4]), 2), bar[5].astype(int)) for bar in data]
-                    await write_to_db(connection, params)
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        data = np.genfromtxt(data, dtype=None, delimiter=',', skip_header=1)
+                    if len(data) != 0:
+                        params = [(stock_id, datetime.datetime.strptime(str(bar[0], 'utf-8'), "%Y-%m-%d %H:%M:%S"), round(Decimal(bar[1]), 2), round(Decimal(bar[2]), 2), round(Decimal(bar[3]), 2), round(Decimal(bar[4]), 2), bar[5].astype(int)) for bar in data]
+                        await write_to_db(connection, params)
 
     except Exception as e:
         print("Unable to get url {} due to {}.".format(url, e.__class__))
@@ -29,7 +34,10 @@ async def get_price(pool, stock_id, url):
 async def get_prices(pool, symbol_urls):
     try:
         # schedule aiohttp requests to run concurrently for all symbols
-        ret = await asyncio.gather(*[get_price(pool, symbol[0], symbol[1]) for symbol in symbol_urls])
+        tasks = [get_price(pool, symbol[0], symbol[1]) for symbol in symbol_urls]
+        #ret = await asyncio.gather(*tasks)
+        ret = [await task for task in tqdm(asyncio.as_completed(tasks), total=len(tasks))]
+
         print("Finalized all. Returned  list of {} outputs.".format(len(ret)))
     except Exception as e:
         print(e)
@@ -41,8 +49,7 @@ async def get_stocks():
 
     # get a connection
     async with pool.acquire() as connection:
-        stocks = await connection.fetch("SELECT * FROM stock_dict")
-
+        stocks = await connection.fetch("SELECT * FROM stock_dict where symbol in ('NVDA', 'QQQ', 'SPY', 'MSFT')")
         symbol_urls = []
         for stock in stocks:
             for i in range(1, 3):
@@ -54,9 +61,8 @@ async def get_stocks():
 
 
 start = time.time()
-
+asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 asyncio.run(get_stocks())
-
 end = time.time()
 
 print("Took {} seconds.".format(end - start))
