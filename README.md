@@ -1,5 +1,4 @@
 # StockDB
- Stock Database
 
 Credit: Youtuber Part Time Larry's TimescaleDB series
 
